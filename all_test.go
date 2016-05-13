@@ -16,6 +16,9 @@ func (a *Api) Ping(req *struct {
 }, resp *struct {
 	Echo string
 }) error {
+	if req.Greetings == "foobar" {
+		return fmt.Errorf("foobar")
+	}
 	resp.Echo = req.Greetings
 	return nil
 }
@@ -53,7 +56,7 @@ func TestCall(t *testing.T) {
 		t.Fatalf("wrong number of methods registered")
 	}
 	http.Handle("/", handler)
-	go http.ListenAndServe(":7899", nil)
+	go http.ListenAndServe(addr, nil)
 
 	str := "hello, world!"
 
@@ -99,8 +102,8 @@ func TestCall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request error: %v", err)
 	}
-	if resp.StatusCode != 404 {
-		t.Fatalf("not 404")
+	if resp.StatusCode != 405 {
+		t.Fatalf("not 405")
 	}
 
 	// invalid json
@@ -108,8 +111,8 @@ func TestCall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request error: %v", err)
 	}
-	if resp.StatusCode != 500 {
-		t.Fatalf("not 500")
+	if resp.StatusCode != 400 {
+		t.Fatalf("not 400")
 	}
 
 	// invalid response struct
@@ -117,8 +120,50 @@ func TestCall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request error: %v", err)
 	}
-	if resp.StatusCode != 500 {
-		t.Fatalf("not 500")
+	if resp.StatusCode != 581 {
+		t.Fatalf("not 581")
 	}
 
+	// bad call
+	resp, err = http.Post("http://localhost"+addr+"/Ping", "application/json", bytes.NewReader([]byte(`
+	{"Greetings": "foobar"}
+	`)))
+	if err != nil {
+		t.Fatalf("request error: %v", err)
+	}
+	if resp.StatusCode != 580 {
+		t.Fatalf("not 580")
+	}
+
+}
+
+func BenchmarkEcho(b *testing.B) {
+	addr := ":7898"
+	handler := NewHandler()
+	handler.Register(new(Api))
+	mux := http.NewServeMux()
+	mux.Handle("/", handler)
+	go http.ListenAndServe(addr, mux)
+
+	str := "hello, world!"
+	buf := new(bytes.Buffer)
+	json.NewEncoder(buf).Encode(struct {
+		Greetings string
+	}{
+		str,
+	})
+	reqData := buf.Bytes()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		resp, err := http.Post("http://localhost"+addr+"/Ping", "application/json", bytes.NewReader(reqData))
+		if err != nil {
+			b.Fatalf("request error: %v", err)
+		}
+		defer resp.Body.Close()
+		_, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			b.Fatalf("read body error: %v")
+		}
+	}
 }

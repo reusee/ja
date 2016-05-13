@@ -77,25 +77,29 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var method *Method
 	var ok bool
 	if method, ok = h.methods[what]; !ok { // no method
-		http.NotFound(w, r)
+		http.Error(w, "Method Not Found", 405)
 		return
 	}
 	// decode request data
 	reqData := reflect.New(method.reqType)
 	de := json.NewDecoder(r.Body)
 	if err := de.Decode(reqData.Interface()); err != nil {
-		http.Error(w, "Request Decode Error", 500)
+		http.Error(w, "Request Decode Error", 400)
 		return
 	}
 	// call method
 	respData := reflect.New(method.respType)
-	method.fn.Call([]reflect.Value{
+	err := method.fn.Call([]reflect.Value{
 		method.api, reqData, respData,
 	})[0].Interface()
+	if err != nil {
+		http.Error(w, "Call Error", 580)
+		return
+	}
 	// encode response data
 	en := json.NewEncoder(w)
 	if err := en.Encode(respData.Interface()); err != nil {
-		http.Error(w, "Response Encode Error", 500)
+		http.Error(w, "Response Encode Error", 581)
 		return
 	}
 }
