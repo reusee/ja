@@ -77,7 +77,7 @@ func TestCall(t *testing.T) {
 	defer resp.Body.Close()
 	content, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		t.Fatalf("read body error: %v")
+		t.Fatalf("read body error: %v", err)
 	}
 	var ret struct {
 		Status string
@@ -100,7 +100,7 @@ func TestCall(t *testing.T) {
 	defer resp.Body.Close()
 	content, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		t.Fatalf("read body error: %v")
+		t.Fatalf("read body error: %v", err)
 	}
 	if err := json.Unmarshal(content, &ret); err != nil {
 		t.Fatalf("decode error: %v", err)
@@ -117,7 +117,7 @@ func TestCall(t *testing.T) {
 	defer resp.Body.Close()
 	content, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		t.Fatalf("read body error: %v")
+		t.Fatalf("read body error: %v", err)
 	}
 	if err := json.Unmarshal(content, &ret); err != nil {
 		t.Fatalf("decode error: %v", err)
@@ -134,7 +134,7 @@ func TestCall(t *testing.T) {
 	defer resp.Body.Close()
 	content, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		t.Fatalf("read body error: %v")
+		t.Fatalf("read body error: %v", err)
 	}
 	if err := json.Unmarshal(content, &ret); err != nil {
 		t.Fatalf("decode error: %v", err)
@@ -159,7 +159,7 @@ func TestCall(t *testing.T) {
 	defer resp.Body.Close()
 	content, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		t.Fatalf("read body error: %v")
+		t.Fatalf("read body error: %v", err)
 	}
 	if err := json.Unmarshal(content, &ret); err != nil {
 		t.Fatalf("decode error: %v", err)
@@ -196,7 +196,7 @@ func BenchmarkEcho(b *testing.B) {
 		defer resp.Body.Close()
 		_, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
-			b.Fatalf("read body error: %v")
+			b.Fatalf("read body error: %v", err)
 		}
 	}
 }
