@@ -60,6 +60,7 @@ func TestCall(t *testing.T) {
 
 	str := "hello, world!"
 
+	// normal
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(struct {
 		Greetings string
@@ -79,12 +80,15 @@ func TestCall(t *testing.T) {
 		t.Fatalf("read body error: %v")
 	}
 	var ret struct {
-		Echo string
+		Status string
+		Result struct {
+			Echo string
+		}
 	}
 	if err := json.Unmarshal(content, &ret); err != nil {
 		t.Fatalf("decode error: %v", err)
 	}
-	if ret.Echo != str {
+	if ret.Result.Echo != str {
 		t.Fatalf("echo not match")
 	}
 
@@ -93,8 +97,16 @@ func TestCall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request error: %v", err)
 	}
-	if resp.StatusCode != 500 {
-		t.Fatalf("not 500")
+	defer resp.Body.Close()
+	content, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body error: %v")
+	}
+	if err := json.Unmarshal(content, &ret); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if ret.Status != "error" {
+		t.Fatalf("not error")
 	}
 
 	// no method
@@ -102,8 +114,16 @@ func TestCall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request error: %v", err)
 	}
-	if resp.StatusCode != 405 {
-		t.Fatalf("not 405")
+	defer resp.Body.Close()
+	content, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body error: %v")
+	}
+	if err := json.Unmarshal(content, &ret); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if ret.Status != "no such method" {
+		t.Fatalf("status not match")
 	}
 
 	// invalid json
@@ -111,17 +131,22 @@ func TestCall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request error: %v", err)
 	}
-	if resp.StatusCode != 400 {
-		t.Fatalf("not 400")
+	defer resp.Body.Close()
+	content, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body error: %v")
+	}
+	if err := json.Unmarshal(content, &ret); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if ret.Status != "bad request" {
+		t.Fatalf("status not match")
 	}
 
 	// invalid response struct
 	resp, err = http.Post("http://localhost"+addr+"/Bad", "application/json", bytes.NewReader([]byte("{}")))
-	if err != nil {
-		t.Fatalf("request error: %v", err)
-	}
-	if resp.StatusCode != 581 {
-		t.Fatalf("not 581")
+	if err == nil {
+		t.Fatalf("no error")
 	}
 
 	// bad call
@@ -131,8 +156,16 @@ func TestCall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request error: %v", err)
 	}
-	if resp.StatusCode != 580 {
-		t.Fatalf("not 580")
+	defer resp.Body.Close()
+	content, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body error: %v")
+	}
+	if err := json.Unmarshal(content, &ret); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if ret.Status != "foobar" {
+		t.Fatalf("status not match")
 	}
 
 }

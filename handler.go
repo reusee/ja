@@ -9,13 +9,13 @@ import (
 )
 
 type Handler struct {
-	methods map[string]*Method
+	methods map[string]*_Method
 	hooks   []Hook
 }
 
 type Hook func(w http.ResponseWriter, req *http.Request) error
 
-type Method struct {
+type _Method struct {
 	api               reflect.Value
 	reqType, respType reflect.Type
 	name              string
@@ -26,7 +26,7 @@ var errorType = reflect.TypeOf((*error)(nil)).Elem()
 
 func NewHandler(hooks ...Hook) *Handler {
 	return &Handler{
-		methods: make(map[string]*Method),
+		methods: make(map[string]*_Method),
 		hooks:   hooks,
 	}
 }
@@ -52,7 +52,7 @@ func (h *Handler) Register(o interface{}) {
 		if methodType.Out(0) != errorType {
 			continue
 		}
-		m := &Method{
+		m := &_Method{
 			api:      apiValue,
 			reqType:  methodType.In(1).Elem(),
 			respType: methodType.In(2).Elem(),
@@ -63,28 +63,33 @@ func (h *Handler) Register(o interface{}) {
 	}
 }
 
+type _Response struct {
+	Status string      `json:"status"`
+	Result interface{} `json:"result"`
+}
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// hooks
 	for _, hook := range h.hooks {
 		if err := hook(w, r); err != nil {
-			http.Error(w, "Internal Server Error", 500)
+			responseStatus(w, err.Error())
 			return
 		}
 	}
 	// requested method
 	pathParts := strings.Split(r.URL.Path, "/")
 	what := pathParts[len(pathParts)-1]
-	var method *Method
+	var method *_Method
 	var ok bool
 	if method, ok = h.methods[what]; !ok { // no method
-		http.Error(w, "Method Not Found", 405)
+		responseStatus(w, "no such method")
 		return
 	}
 	// decode request data
 	reqData := reflect.New(method.reqType)
 	de := json.NewDecoder(r.Body)
 	if err := de.Decode(reqData.Interface()); err != nil {
-		http.Error(w, "Request Decode Error", 400)
+		responseStatus(w, "bad request")
 		return
 	}
 	// call method
@@ -93,13 +98,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		method.api, reqData, respData,
 	})[0].Interface()
 	if err != nil {
-		http.Error(w, "Call Error", 580)
+		responseStatus(w, err.(error).Error())
 		return
 	}
 	// encode response data
-	en := json.NewEncoder(w)
-	if err := en.Encode(respData.Interface()); err != nil {
-		http.Error(w, "Response Encode Error", 581)
-		return
+	if err := json.NewEncoder(w).Encode(_Response{
+		Status: "ok",
+		Result: respData.Interface(),
+	}); err != nil {
+		panic(err)
 	}
+}
+
+func responseStatus(w http.ResponseWriter, status string) {
+	json.NewEncoder(w).Encode(_Response{
+		Status: status,
+	})
 }
