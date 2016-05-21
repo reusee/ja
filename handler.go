@@ -2,15 +2,17 @@ package ja
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"reflect"
-	"strings"
 	"unicode"
 )
 
 type Handler struct {
-	methods map[string]*_Method
-	hooks   []Hook
+	methods    map[string]*_Method
+	hooks      []Hook
+	methodName func(*http.Request) string
 }
 
 type Hook func(w http.ResponseWriter, req *http.Request) error
@@ -31,7 +33,7 @@ func NewHandler(hooks ...Hook) *Handler {
 	}
 }
 
-func (h *Handler) Register(o interface{}) {
+func (h *Handler) Register(o interface{}, methodName func(r *http.Request) string) {
 	objType := reflect.TypeOf(o)
 	nMethods := objType.NumMethod()
 	apiValue := reflect.ValueOf(o)
@@ -61,6 +63,7 @@ func (h *Handler) Register(o interface{}) {
 		}
 		h.methods[m.name] = m
 	}
+	h.methodName = methodName
 }
 
 type _Response struct {
@@ -77,8 +80,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// requested method
-	pathParts := strings.Split(r.URL.Path, "/")
-	what := pathParts[len(pathParts)-1]
+	what := h.methodName(r)
 	var method *_Method
 	var ok bool
 	if method, ok = h.methods[what]; !ok { // no method
@@ -86,19 +88,26 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// decode request data
+	content, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		responseStatus(w, "bad request body")
+		return
+	}
+	fmt.Printf("%q\n", content)
 	reqData := reflect.New(method.reqType)
-	de := json.NewDecoder(r.Body)
-	if err := de.Decode(reqData.Interface()); err != nil {
+	if err := json.Unmarshal(content, reqData.Interface()); err != nil {
+		fmt.Printf("%v\n", err)
 		responseStatus(w, "bad request")
 		return
 	}
 	// call method
 	respData := reflect.New(method.respType)
-	err := method.fn.Call([]reflect.Value{
+	callError := method.fn.Call([]reflect.Value{
 		method.api, reqData, respData,
 	})[0].Interface()
-	if err != nil {
-		responseStatus(w, err.(error).Error())
+	if callError != nil {
+		fmt.Printf("%v\n", callError)
+		responseStatus(w, "call error")
 		return
 	}
 	// encode response data

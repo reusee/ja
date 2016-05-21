@@ -6,10 +6,16 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 )
 
 type Api struct{}
+
+func methodName(r *http.Request) string {
+	pathParts := strings.Split(r.URL.Path, "/")
+	return pathParts[len(pathParts)-1]
+}
 
 func (a *Api) Ping(req *struct {
 	Greetings string
@@ -51,7 +57,7 @@ func TestCall(t *testing.T) {
 		}
 		return nil
 	})
-	handler.Register(new(Api))
+	handler.Register(new(Api), methodName)
 	if len(handler.methods) != 2 {
 		t.Fatalf("wrong number of methods registered")
 	}
@@ -173,7 +179,7 @@ func TestCall(t *testing.T) {
 func BenchmarkEcho(b *testing.B) {
 	addr := ":7898"
 	handler := NewHandler()
-	handler.Register(new(Api))
+	handler.Register(new(Api), methodName)
 	mux := http.NewServeMux()
 	mux.Handle("/", handler)
 	go http.ListenAndServe(addr, mux)
