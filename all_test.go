@@ -18,14 +18,17 @@ func methodName(r *http.Request) string {
 }
 
 func (a *Api) Ping(req *struct {
+	GoodId    int64 `json:"good_id"`
 	Greetings string
 }, resp *struct {
 	Echo string
+	Num  int64
 }) error {
 	if req.Greetings == "foobar" {
 		return fmt.Errorf("foobar")
 	}
 	resp.Echo = req.Greetings
+	resp.Num = req.GoodId
 	return nil
 }
 
@@ -69,8 +72,10 @@ func TestCall(t *testing.T) {
 	// normal
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(struct {
+		GoodId    int64 `json:"good_id"`
 		Greetings string
 	}{
+		42,
 		str,
 	}); err != nil {
 		t.Fatalf("request encode error: %v", err)
@@ -89,6 +94,7 @@ func TestCall(t *testing.T) {
 		Status string
 		Result struct {
 			Echo string
+			Num  int64
 		}
 	}
 	if err := json.Unmarshal(content, &ret); err != nil {
@@ -96,6 +102,9 @@ func TestCall(t *testing.T) {
 	}
 	if ret.Result.Echo != str {
 		t.Fatalf("echo not match")
+	}
+	if ret.Result.Num != 42 {
+		t.Fatalf("num not match")
 	}
 
 	// hook error
@@ -170,7 +179,7 @@ func TestCall(t *testing.T) {
 	if err := json.Unmarshal(content, &ret); err != nil {
 		t.Fatalf("decode error: %v", err)
 	}
-	if ret.Status != "foobar" {
+	if ret.Status != "call error" {
 		t.Fatalf("status not match")
 	}
 
